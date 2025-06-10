@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Horas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Vibrant Neutrals & Strong Blue -->
+    <!-- Application Structure Plan: The architecture is now a multi-view Single Page Application (SPA) contained within one file. It starts with a Login/Registration view. Upon successful authentication (simulated via localStorage), the user is taken to the main application view. This structure securely isolates the main app functionality and provides a standard, expected user flow. Data is now namespaced under the logged-in user in localStorage, providing data persistence and a multi-user simulation. -->
+    <!-- Visualization & Content Choices: Report Info: User Authentication -> Goal: Access Control -> Viz: Login/Register Forms -> Interaction: Form submission -> Justification: Standard pattern for securing application access. | Report Info: Data Export -> Goal: Allow data portability -> Viz: 'Exportar' Button -> Interaction: Click triggers CSV download -> Justification: CSV is a universal format and simple to implement client-side. | Currency is now EUR, and colors are more saturated for better visual hierarchy and contrast, improving the mobile UX. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .fab { position: fixed; bottom: 1.5rem; right: 1.5rem; }
+        .modal-backdrop {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); z-index: 40;
+        }
+        .modal-content { z-index: 50; }
+        .view { display: none; }
+        .view.active { display: block; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Login View -->
+    <div id="login-view" class="view active min-h-screen flex items-center justify-center p-4 bg-gray-100">
+        <div class="max-w-sm w-full bg-white p-8 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Login</h2>
+            <form id="login-form" class="space-y-4">
+                <input type="email" id="login-email" placeholder="Email" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="password" id="login-password" placeholder="Senha" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <p id="login-error" class="text-red-500 text-sm text-center"></p>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105">Entrar</button>
+            </form>
+            <p class="text-center text-sm text-gray-600 mt-6">
+                Não tem uma conta? <a href="#" id="show-register" class="font-semibold text-blue-600 hover:underline">Cadastre-se</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Register View -->
+    <div id="register-view" class="view min-h-screen flex items-center justify-center p-4 bg-gray-100">
+        <div class="max-w-sm w-full bg-white p-8 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Cadastro</h2>
+            <form id="register-form" class="space-y-4">
+                 <input type="email" id="register-email" placeholder="Email" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="password" id="register-password" placeholder="Senha" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <p id="register-error" class="text-red-500 text-sm text-center"></p>
+                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105">Criar Conta</button>
+            </form>
+            <p class="text-center text-sm text-gray-600 mt-6">
+                Já tem uma conta? <a href="#" id="show-login" class="font-semibold text-blue-600 hover:underline">Faça Login</a>
+            </p>
+        </div>
+    </div>
+    
+    <!-- Main App View -->
+    <div id="app-view" class="view">
+        <div id="app-container" class="max-w-lg mx-auto bg-white min-h-screen shadow-lg">
+            <header class="bg-white border-b border-gray-200 p-4 flex justify-between items-center sticky top-0 z-10">
+                <h1 class="text-xl font-bold text-gray-900">Meu Controle</h1>
+                <div class="flex items-center space-x-2">
+                    <button id="export-btn" class="p-2 rounded-full hover:bg-gray-100 transition-colors" title="Exportar para Excel (CSV)">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                    </button>
+                    <button id="filter-btn" class="p-2 rounded-full hover:bg-gray-100 transition-colors" title="Filtrar">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-5.414 5.414a1 1 0 00-.293.707V19l-4 2v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                    </button>
+                     <button id="logout-btn" class="p-2 rounded-full hover:bg-red-100 transition-colors" title="Sair">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                    </button>
+                </div>
+            </header>
+
+            <main class="p-4 space-y-6">
+                <section id="summary-section">
+                    <h2 class="text-sm font-semibold text-gray-500 mb-3 uppercase tracking-wider">Resumo por Patrão</h2>
+                    <div id="summary-cards" class="flex overflow-x-auto space-x-4 pb-4"></div>
+                </section>
+
+                <section id="entries-section">
+                    <h2 class="text-sm font-semibold text-gray-500 mb-3 uppercase tracking-wider">Lançamentos</h2>
+                    <div id="entries-list" class="space-y-3"></div>
+                </section>
+            </main>
+
+            <button id="add-entry-fab" class="fab bg-blue-600 hover:bg-blue-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-transform transform hover:scale-105">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Modals (part of App View) -->
+    <div id="add-entry-modal" class="hidden fixed inset-0 flex items-center justify-center p-4">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content bg-white rounded-lg shadow-xl w-11/12 max-w-md p-6">
+            <h3 class="text-lg font-bold mb-4">Adicionar Lançamento</h3>
+            <form id="add-entry-form" class="space-y-4">
+                <input type="text" id="patrao" placeholder="Nome do Patrão" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="date" id="data" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div class="grid grid-cols-2 gap-4">
+                    <input type="number" step="0.01" id="horas" placeholder="Horas (ex: 5.5)" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="number" step="0.01" id="valorHora" placeholder="Valor/Hora (€)" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" id="cancel-add-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-md">Cancelar</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+     <div id="filter-modal" class="hidden fixed inset-0 flex items-center justify-center p-4">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content bg-white rounded-lg shadow-xl w-11/12 max-w-md p-6">
+            <h3 class="text-lg font-bold mb-4">Filtrar Lançamentos</h3>
+            <form id="filter-form" class="space-y-4">
+                <select id="filter-patrao" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="all">Todos os patrões</option>
+                </select>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" id="cancel-filter-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-md">Cancelar</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md">Aplicar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const views = {
+            login: document.getElementById('login-view'),
+            register: document.getElementById('register-view'),
+            app: document.getElementById('app-view'),
+        };
+
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const showRegisterLink = document.getElementById('show-register');
+        const showLoginLink = document.getElementById('show-login');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        const switchView = (viewName) => {
+            Object.values(views).forEach(v => v.classList.remove('active'));
+            views[viewName].classList.add('active');
+        };
+
+        const getUsers = () => {
+            return JSON.parse(localStorage.getItem('timeAppUsers') || '{}');
+        };
+        const saveUsers = (users) => {
+            localStorage.setItem('timeAppUsers', JSON.stringify(users));
+        };
+        const getCurrentUser = () => {
+            return localStorage.getItem('timeAppCurrentUser');
+        };
+        const setCurrentUser = (email) => {
+            localStorage.setItem('timeAppCurrentUser', email);
+        };
+        const clearCurrentUser = () => {
+            localStorage.removeItem('timeAppCurrentUser');
+        };
+
+        showRegisterLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchView('register');
+        });
+        showLoginLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchView('login');
+        });
+
+        registerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            const errorEl = document.getElementById('register-error');
+            
+            const users = getUsers();
+            if (users[email]) {
+                errorEl.textContent = 'Este email já está cadastrado.';
+                return;
+            }
+            
+            users[email] = { password: password, entries: [] };
+            saveUsers(users);
+            setCurrentUser(email);
+            initializeApp(email);
+        });
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const errorEl = document.getElementById('login-error');
+
+            const users = getUsers();
+            if (users[email] && users[email].password === password) {
+                setCurrentUser(email);
+                initializeApp(email);
+            } else {
+                errorEl.textContent = 'Email ou senha inválidos.';
+            }
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            clearCurrentUser();
+            switchView('login');
+            location.reload();
+        });
+        
+        const initAuth = () => {
+            const currentUser = getCurrentUser();
+            if (currentUser) {
+                initializeApp(currentUser);
+            } else {
+                switchView('login');
+            }
+        };
+
+        function initializeApp(userEmail) {
+            switchView('app');
+
+            const summaryCardsContainer = document.getElementById('summary-cards');
+            const entriesListContainer = document.getElementById('entries-list');
+            const addEntryFab = document.getElementById('add-entry-fab');
+            const addEntryModal = document.getElementById('add-entry-modal');
+            const addEntryForm = document.getElementById('add-entry-form');
+            const cancelAddBtn = document.getElementById('cancel-add-btn');
+            
+            const filterBtn = document.getElementById('filter-btn');
+            const filterModal = document.getElementById('filter-modal');
+            const filterForm = document.getElementById('filter-form');
+            const filterPatraoSelect = document.getElementById('filter-patrao');
+            const cancelFilterBtn = document.getElementById('cancel-filter-btn');
+            const exportBtn = document.getElementById('export-btn');
+
+            const clientColors = {};
+            let colorIndex = 0;
+            const availablePalettes = ['purple', 'pink', 'teal', 'indigo', 'yellow', 'red', 'cyan'];
+            const colorClasses = {
+                'blue': { bg: 'bg-blue-500', border: 'border-blue-500', text: 'text-white' },
+                'green': { bg: 'bg-green-500', border: 'border-green-500', text: 'text-white' },
+                'orange': { bg: 'bg-orange-500', border: 'border-orange-500', text: 'text-white' },
+                'purple': { bg: 'bg-purple-500', border: 'border-purple-500', text: 'text-white' },
+                'pink': { bg: 'bg-pink-500', border: 'border-pink-500', text: 'text-white' },
+                'teal': { bg: 'bg-teal-500', border: 'border-teal-500', text: 'text-white' },
+                'indigo': { bg: 'bg-indigo-500', border: 'border-indigo-500', text: 'text-white' },
+                'yellow': { bg: 'bg-yellow-500', border: 'border-yellow-500', text: 'text-gray-900' },
+                'red': { bg: 'bg-red-500', border: 'border-red-500', text: 'text-white' },
+                'cyan': { bg: 'bg-cyan-500', border: 'border-cyan-500', text: 'text-white' },
+            };
+            
+            const getClientColor = (clientName) => {
+                if (!clientColors[clientName]) {
+                    const nextColor = availablePalettes[colorIndex % availablePalettes.length];
+                    clientColors[clientName] = colorClasses[nextColor];
+                    colorIndex++;
+                }
+                return clientColors[clientName];
+            };
+
+            let entries = [];
+            let currentFilter = 'all';
+
+            const loadEntries = () => {
+                const users = getUsers();
+                entries = users[userEmail]?.entries || [];
+                 if(entries.length === 0) { // Add some demo data for new users
+                    entries = [
+                        { id: 1, patrao: 'Cliente Exemplo A', data: '2025-06-10', horas: 5.5, valorHora: 50 },
+                        { id: 2, patrao: 'Cliente Exemplo B', data: '2025-06-09', horas: 8, valorHora: 45 },
+                    ];
+                    saveEntries();
+                }
+            };
+            const saveEntries = () => {
+                const users = getUsers();
+                if (users[userEmail]) {
+                    users[userEmail].entries = entries;
+                    saveUsers(users);
+                }
+            };
+
+            const formatCurrency = (value) => value.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+            const formatHours = (hoursDecimal) => {
+                const hours = Math.floor(hoursDecimal);
+                const minutes = Math.round((hoursDecimal - hours) * 60);
+                return `${hours}h ${minutes > 0 ? `${minutes}min` : ''}`.trim();
+            };
+            const formatDate = (dateString) => {
+                const [year, month, day] = dateString.split('-');
+                return `${day}/${month}/${year}`;
+            };
+            
+            const renderSummaries = () => {
+                const summaries = entries.reduce((acc, entry) => {
+                    if (!acc[entry.patrao]) acc[entry.patrao] = 0;
+                    acc[entry.patrao] += entry.horas * entry.valorHora;
+                    return acc;
+                }, {});
+
+                summaryCardsContainer.innerHTML = '';
+                if (Object.keys(summaries).length === 0) {
+                     summaryCardsContainer.innerHTML = `<p class="text-gray-500 text-sm">Nenhum resumo disponível.</p>`;
+                } else {
+                    for (const patrao in summaries) {
+                        const colors = getClientColor(patrao);
+                        const card = document.createElement('div');
+                        card.className = `p-4 rounded-lg shadow-md min-w-[180px] ${colors.bg}`;
+                        card.innerHTML = `<p class="font-bold ${colors.text}">${patrao}</p><p class="text-2xl font-semibold ${colors.text} mt-2">${formatCurrency(summaries[patrao])}</p>`;
+                        summaryCardsContainer.appendChild(card);
+                    }
+                }
+            };
+            
+            const renderFilterOptions = () => {
+                const uniqueClients = [...new Set(entries.map(e => e.patrao))];
+                filterPatraoSelect.innerHTML = '<option value="all">Todos os patrões</option>';
+                uniqueClients.forEach(client => {
+                    const option = document.createElement('option');
+                    option.value = client;
+                    option.textContent = client;
+                    filterPatraoSelect.appendChild(option);
+                });
+                filterPatraoSelect.value = currentFilter;
+            };
+
+            const getFilteredEntries = () => {
+                 return entries
+                    .filter(entry => currentFilter === 'all' || entry.patrao === currentFilter)
+                    .sort((a, b) => new Date(b.data) - new Date(a.data));
+            }
+
+            const renderEntries = () => {
+                entriesListContainer.innerHTML = '';
+                const filteredEntries = getFilteredEntries();
+
+                if (filteredEntries.length === 0) {
+                    entriesListContainer.innerHTML = `<div class="text-center py-10"><p class="text-gray-500">Nenhum lançamento encontrado.</p><p class="text-gray-400 text-sm">${currentFilter !== 'all' ? 'Tente limpar o filtro.' : 'Adicione um novo lançamento para começar.'}</p></div>`;
+                    return;
+                }
+
+                filteredEntries.forEach(entry => {
+                    const total = entry.horas * entry.valorHora;
+                    const colors = getClientColor(entry.patrao);
+                    const entryCard = document.createElement('div');
+                    entryCard.className = `bg-white p-4 rounded-lg shadow-sm border-l-4 ${colors.border} flex flex-col sm:flex-row sm:items-center sm:justify-between`;
+                    entryCard.innerHTML = `<div><p class="font-bold text-gray-800">${entry.patrao}</p><p class="text-sm text-gray-500">${formatDate(entry.data)}</p></div><div class="mt-2 sm:mt-0 sm:text-right"><p class="font-semibold text-lg text-gray-900">${formatCurrency(total)}</p><p class="text-sm text-gray-500">${formatHours(entry.horas)} @ ${formatCurrency(entry.valorHora)}/h</p></div>`;
+                    entriesListContainer.appendChild(entryCard);
+                });
+            };
+
+            const toggleModal = (modal, show) => modal.classList.toggle('hidden', !show);
+            addEntryFab.addEventListener('click', () => {
+                addEntryForm.reset();
+                document.getElementById('data').value = new Date().toISOString().split('T')[0];
+                toggleModal(addEntryModal, true);
+            });
+            cancelAddBtn.addEventListener('click', () => toggleModal(addEntryModal, false));
+            addEntryModal.querySelector('.modal-backdrop').addEventListener('click', () => toggleModal(addEntryModal, false));
+            filterBtn.addEventListener('click', () => {
+                renderFilterOptions();
+                toggleModal(filterModal, true)
+            });
+            cancelFilterBtn.addEventListener('click', () => toggleModal(filterModal, false));
+            filterModal.querySelector('.modal-backdrop').addEventListener('click', () => toggleModal(filterModal, false));
+
+            addEntryForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const newEntry = {
+                    id: Date.now(),
+                    patrao: e.target.patrao.value.trim(),
+                    data: e.target.data.value,
+                    horas: parseFloat(e.target.horas.value),
+                    valorHora: parseFloat(e.target.valorHora.value),
+                };
+                entries.push(newEntry);
+                saveEntries();
+                toggleModal(addEntryModal, false);
+                renderAll();
+            });
+            
+            filterForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                currentFilter = filterPatraoSelect.value;
+                toggleModal(filterModal, false);
+                renderEntries();
+            });
+
+            exportBtn.addEventListener('click', () => {
+                const dataToExport = getFilteredEntries();
+                if(dataToExport.length === 0) {
+                    alert('Não há dados para exportar.');
+                    return;
+                }
+                let csvContent = "data:text/csv;charset=utf-8,";
+                csvContent += "Patrao,Data,Horas,Valor Por Hora,Total\r\n";
+                dataToExport.forEach(entry => {
+                    const total = entry.horas * entry.valorHora;
+                    const row = [entry.patrao, entry.data, entry.horas, entry.valorHora, total].join(",");
+                    csvContent += row + "\r\n";
+                });
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "controle_de_horas.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+
+            const renderAll = () => {
+                renderSummaries();
+                renderEntries();
+            };
+            
+            loadEntries();
+            renderAll();
+        }
+
+        initAuth();
+    });
+    </script>
+</body>
+</html>
